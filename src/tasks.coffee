@@ -32,7 +32,6 @@ saveData = () ->
 
 # Task collection methods
 getChannelTasks = (channelName) ->
-  log 'debug', 'getChannelTasks()'
   channels = DATA.channels
   channels[channelName] = channels[channelName] || []
   channels[channelName]
@@ -42,7 +41,6 @@ setChannelTasks = (channelName, tasks) ->
 
 # Task methods
 addChannelTask = (channelName, taskTitle) ->
-  log 'debug', 'addChannelTask()'
   tasks = getChannelTasks channelName
   tasks.push({
     title: taskTitle,
@@ -61,17 +59,28 @@ removeChannelTask = (channelName, taskIndex) ->
 
 # Helper methods
 listChannelTasks = (msg) ->
+  channelName = getChannelName(msg.message.room)
   tasks = getChannelTasks msg.message.room
   completed = tasks.filter (task) -> task.complete
-  return msg.send "There are no tasks! Add one with `#{ROBOT.name} task add <task title>`." if tasks.length == 0
+  if tasks.length == 0
+    return msg.send "There are no tasks for *#{channelName}*! Add one with `#{ROBOT.name} task add <task title>`."
   percent = parseInt((completed.length / tasks.length) * 100)
-  msg.send "#{completed.length} of #{tasks.length} tasks completed. #{percent}%"
+  text = "#{channelName} has #{completed.length} of #{tasks.length} tasks completed. #{percent}%\n"
   if percent == 100
-    msg.send "Way to go gang! Want to start another list? Clear all the tasks with `#{ROBOT.name} task remove all`"
+    text += "Way to go gang! Want to start another list? Clear all the tasks with `#{ROBOT.name} task remove all`\n"
+  text += "```\n"
   for task, i in tasks
     complete = if task.complete == true then "✓" else " "
     index = if (i+1).toString().length == 1 then " #{i+1}" else i+1
-    msg.send "#{index}: [#{complete}] #{task.title}"
+    text += "#{index}: [#{complete}] #{task.title}\n"
+  text += "```\n"
+  msg.send text
+getChannelName = (channelId) ->
+  if ROBOT.adapterName == 'slack'
+    channel = ROBOT.adapter.client.rtm.dataStore.getChannelGroupOrDMById(channelId)
+    "<##{channelId}>"
+  else
+    channelId
 
 module.exports = (robot) ->
   ROBOT = robot
@@ -108,9 +117,12 @@ module.exports = (robot) ->
   robot.respond /tasks? remove all( confirm)?/i, (msg) ->
     tasks = getChannelTasks msg.message.room
     completed = tasks.filter (task) -> task.complete
+    channelName = getChannelName(msg.message.room)
     if completed.length == tasks.length || msg.match[1]
       DATA.channels[msg.message.room] = []
       saveData()
-      msg.send "All tasks have been removed! Add more tasks with `#{ROBOT.name} task add <task title>`"
+      msg.send "All tasks have been removed in *#{channelName}*! " +
+               "Add more tasks with `#{ROBOT.name} task add <task title>`"
     else
-      msg.send "There are incomplete tasks. Reply with `#{robot.name} task remove all confirm` to remove all tasks."
+      msg.send "There are incomplete tasks in *#{channelName}*. " +
+               "Reply with `#{robot.name} task remove all confirm` to remove all tasks."
