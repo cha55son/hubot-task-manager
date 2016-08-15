@@ -49,11 +49,13 @@ addChannelTask = (channelName, taskTitle) ->
   saveData()
 updateChannelTask = (channelName, taskIndex, params) ->
   task = getChannelTasks(channelName)[taskIndex]
+  return false unless task
   task.title = params.title if params.title
   task.complete = if typeof params.complete == 'undefined' then task.complete else params.complete == true
   saveData()
 removeChannelTask = (channelName, taskIndex) ->
   tasks = getChannelTasks channelName
+  return false unless taskIndex >= 0 && taskIndex < tasks.length
   tasks.splice(taskIndex, 1)
   saveData()
 
